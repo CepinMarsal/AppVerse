@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application - AppVerse</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --app-primary: #2563EB;
+            --sidebar-width: 280px;
+        }
+        body { background: #f1f5f9; padding: 0; display: flex; min-height: 100vh; font-family: 'Inter', sans-serif; margin:0; }
+        
+        /* Layout */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+        }
+        .main-container {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 3rem;
+            max-width: calc(100vw - var(--sidebar-width));
+        }
+
+        /* Sidebar Styling */
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: var(--app-primary);
+            text-transform: uppercase;
+            letter-spacing: -0.05em;
+        }
+        .sidebar-menu { flex: 1; padding: 1.5rem 1rem; }
+        .menu-item {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            color: #64748b;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .menu-item:hover { background: #f8fafc; color: var(--app-primary); }
+        .menu-item.active { background: var(--app-primary); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+        /* Card & Grid */
+        .app-card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2rem; }
+        .product-item {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .product-item:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.05); }
+        .product-info { padding: 1.5rem; }
+        
+        .btn-action {
+            background: var(--app-primary);
+            color: white;
+            border: none;
+            padding: 0.875rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 700;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        .btn-action:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Themes */
+        .shopee-theme { --app-primary: #EE4D2D; }
+        .tokopedia-theme { --app-primary: #42B549; }
+        .gojek-theme { --app-primary: #00AA13; }
+        .fore-theme { --app-primary: #005C32; }
+        .janjijiwa-theme { --app-primary: #4B3621; }
+        .instagram-theme { --app-primary: #E1306C; }
+
+        /* Custom UI */
+        .map-box { height: 400px; background: #e2e8f0; border-radius: 16px; margin-bottom: 2rem; display: flex; align-items: center; justify-content: center; font-size: 4rem; border: 1px solid #cbd5e1; }
+        .voucher-select { width: 100%; padding: 1rem; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 1rem; font-weight: 600; }
+        .cart-badge { background: #ef4444; color: white; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-left: auto; }
+        
+        /* Profile Details */
+        .profile-row { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid #f1f5f9; }
+        .profile-label { color: #64748b; font-weight: 500; }
+        .profile-value { font-weight: 700; color: #1e293b; }
+    </style>
+</head>
+<body id="appBody">
+    <aside class="sidebar">
+        <div class="sidebar-header" id="sidebarTitle">App</div>
+        <nav class="sidebar-menu" id="sideMenu"></nav>
+        <div style="padding: 1.5rem; border-top: 1px solid #e2e8f0;">
+            <div class="menu-item" onclick="window.location.href='/dashboard'" style="color: #ef4444;">
+                <span>&larr;</span> Dashboard
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem;">
+            <div>
+                <h1 id="viewTitle" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em; margin: 0;">View</h1>
+                <p id="viewDesc" style="color: #64748b; margin-top: 0.5rem; font-size: 1.125rem;">Description</p>
+            </div>
+            <div id="headerSaldoContainer" class="app-card" style="padding: 1rem 2rem; display: flex; flex-direction: column; align-items: flex-end;">
+                <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Current Saldo</span>
+                <span id="headerSaldo" style="font-size: 1.5rem; font-weight: 800; color: var(--app-primary);">Rp 0</span>
+            </div>
+        </header>
+
+        <div id="mainContent"></div>
+    </main>
+
+    <script>
+        const pathParts = window.location.pathname.split('/');
+        const appId = parseInt(pathParts[pathParts.length - 1]);
+        
+        let currentApp = {};
+        let user = {};
+        let userSaldo = 0;
+        let cart = [];
+        let vouchers = [];
+
+        let userAppProfile = {};
+
+        async function init() {
+            const userRes = await fetch('/api/auth/me');
+            if (!userRes.ok) { window.location.href = '/login'; return; }
+            user = await userRes.json();
+
+            // Auto Init App (Claim Vouchers, etc.)
+            await fetch(`/api/apps/${appId}/init`, { method: 'POST' });
+            
+            const appsRes = await fetch('/api/apps');
+            const apps = await appsRes.json();
+            currentApp = apps.find(a => a.id === appId);
+
+            // Load App Specific Profile
+            const profRes = await fetch(`/api/user/profile/${appId}`);
+            userAppProfile = await profRes.json();
+            
+            document.getElementById('sidebarTitle').innerText = currentApp.nama;
+            document.getElementById('appBody').className = currentApp.nama.toLowerCase().replace(' ', '') + '-theme';
+            
+            await updateSaldo();
+            renderSidebar();
+            showView('home');
+        }
+
+        async function updateSaldo() {
+            const saldoRes = await fetch('/api/apps/saldo');
+            const saldos = await saldoRes.json();
+            userSaldo = saldos[appId] || 0;
+            document.getElementById('headerSaldo').innerText = `Rp ${userSaldo.toLocaleString()}`;
+        }
+
+        function renderSidebar() {
+            const menu = document.getElementById('sideMenu');
+            const appName = currentApp.nama;
+            
+            let items = [
+                { id: 'home', label: 'Home' },
+                { id: 'profile', label: 'Profile' }
+            ];
+
+            if (appName !== 'Instagram') {
+                items.push({ id: 'topup', label: 'Top Up' });
+                items.push({ id: 'history', label: 'History' });
+            }
+
+            if (appName === 'Shopee' || appName === 'Tokopedia' || appName === 'Fore' || appName === 'Janji Jiwa') {
+                items.splice(1, 0, { id: 'cart', label: 'My Cart', badge: true });
+                items.splice(2, 0, { id: 'vouchers', label: 'Vouchers' });
+            } else if (appName === 'Gojek') {
+                items.splice(1, 0, { id: 'vouchers', label: 'My Vouchers' });
+            }
+
+            menu.innerHTML = items.map(item => `
+                <div class="menu-item" id="nav-${item.id}" onclick="showView('${item.id}')">
+                    ${item.label}
+                    ${item.badge ? `<span class="cart-badge" id="cartBadge">0</span>` : ''}
+                </div>
+            `).join('');
+            updateCartBadge();
+        }
+
+        async function showView(view) {
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            const activeNav = document.getElementById(`nav-${view}`);
+            if(activeNav) activeNav.classList.add('active');
+
+            const title = document.getElementById('viewTitle');
+            const desc = document.getElementById('viewDesc');
+            const headerSaldo = document.getElementById('headerSaldoContainer');
+
+            if (currentApp.nama === 'Instagram') {
+                headerSaldo.style.display = 'none';
+            } else {
+                headerSaldo.style.display = 'flex';
+            }
+
+            if (view === 'home') {
+                if (currentApp.nama === 'Gojek') { renderGojek(title, desc); }
+                else if (currentApp.nama === 'Instagram') { renderInstagram(title, desc); }
+                else { renderShop(title, desc); }
+            } else if (view === 'cart') { renderCart(title, desc); }
+            else if (view === 'vouchers') { renderVouchers(title, desc); }
+            else if (view === 'history') { renderHistory(title, desc); }
+            else if (view === 'topup') { renderTopUp(title, desc); }
+            else if (view === 'profile') { renderProfile(title, desc); }
+        }
+
+        // --- COMPONENTS ---
+
+        async function renderShop(title, desc) {
+            const isCartApp = ['Shopee', 'Tokopedia', 'Fore', 'Janji Jiwa'].includes(currentApp.nama);
+            title.innerText = isCartApp ? 'Product Catalog' : 'Available Items';
+            desc.innerText = `Welcome to ${currentApp.nama}. Explore our curated selection.`;
+            
+            const res = await fetch(`/api/apps/${appId}/products`);
+            const products = await res.json();
+            const content = document.getElementById('mainContent');
+            
+            content.innerHTML = `
+                <div class="grid">
+                    ${products.map(p => `
+                        <div class="product-item">
+                            <div style="height: 200px; background: #f8fafc; display:flex; align-items:center; justify-content:center; font-size:4rem;">
+                                ${p.kategori === 'Coffee' ? '☕' : (p.kategori === 'Food' ? '🥪' : '📦')}
+                            </div>
+                            <div class="product-info">
+                                <div style="font-weight:700; font-size:1.25rem; margin-bottom:0.5rem;">${p.nama}</div>
+                                <div style="color:var(--app-primary); font-weight:800; font-size:1.5rem; margin-bottom:1.5rem;">Rp ${p.harga.toLocaleString()}</div>
+                                <button class="btn-action" onclick="${isCartApp ? `addToCart(${p.id}, '${p.nama}', ${p.harga})` : `buyDirect(${p.id}, '${p.nama}', ${p.harga})`}">
+                                    ${isCartApp ? 'Add to Cart' : 'Order Now'}
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderGojek(title, desc) {
+            title.innerText = 'GoRide';
+            desc.innerText = 'Set your pickup and destination.';
+            const content = document.getElementById('mainContent');
+            content.innerHTML = `
+                <div class="grid" style="grid-template-columns: 1.5fr 1fr;">
+                    <div class="app-card">
+                        <div class="map-box">🗺️</div>
+                        <div class="grid" style="grid-template-columns: 1fr 1fr;">
+                            <div>
+                                <label style="display:block; font-weight:700; margin-bottom:0.5rem;">Pickup Point</label>
+                                <input type="text" id="pickup" placeholder="Enter pickup location" style="width:100%; padding:1rem; border:1px solid #e2e8f0; border-radius:12px;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:700; margin-bottom:0.5rem;">Destination</label>
+                                <input type="text" id="dest" placeholder="Where are you going?" oninput="calcGojek()" style="width:100%; padding:1rem; border:1px solid #e2e8f0; border-radius:12px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="app-card" id="gojekOrderCard" style="display:none;">
+                        <h3>Trip Summary</h3>
+                        <div style="margin: 1.5rem 0;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;"><span>Est. Distance</span><span id="gDist">0 km</span></div>
+                            <div style="display:flex; justify-content:space-between; font-weight:800;"><span>Subtotal</span><span id="gPrice">Rp 0</span></div>
+                        </div>
+                        <label>Apply Voucher</label>
+                        <select id="gVoucher" class="voucher-select" onchange="applyGojekVoucher()"></select>
+                        <div style="font-size:1.5rem; font-weight:800; color:var(--app-primary); text-align:right; margin:1.5rem 0;" id="gFinal">Rp 0</div>
+                        <button class="btn-action" onclick="confirmGojek()">Confirm Trip</button>
+                    </div>
+                </div>
+            `;
+            loadVouchersForSelect('gVoucher');
+        }
+
+        function calcGojek() {
+            const dest = document.getElementById('dest').value;
+            const card = document.getElementById('gojekOrderCard');
+            if(dest.length > 2) {
+                card.style.display = 'block';
+                const dist = (Math.random() * 10 + 1).toFixed(1);
+                const price = Math.floor(dist * 3000 + 5000);
+                document.getElementById('gDist').innerText = dist + ' km';
+                document.getElementById('gPrice').innerText = 'Rp ' + price.toLocaleString();
+                window.gBasePrice = price;
+                applyGojekVoucher();
+            } else { card.style.display = 'none'; }
+        }
+
+        async function renderInstagram(title, desc) {
+            title.innerText = 'Instagram Feed';
+            desc.innerText = 'See what others are sharing.';
+            const res = await fetch('/api/apps/posts');
+            const posts = await res.json();
+            const content = document.getElementById('mainContent');
+            
+            const dummyPosts = [
+                { user: 'kopi_lover', text: 'Morning coffee at Fore is the best! ☕' },
+                { user: 'tech_guy', text: 'Just bought a new keyboard on Tokopedia. Super fast delivery!' },
+                { user: 'foodie', text: 'Jiwa Toast is actually pretty good.' }
+            ];
+
+            content.innerHTML = `
+                <div style="max-width: 700px; margin: 0 auto;">
+                    <div class="app-card" style="margin-bottom: 2rem;">
+                        <textarea id="igPost" placeholder="Write something..." style="width:100%; border:none; outline:none; font-size:1.25rem; min-height:100px;"></textarea>
+                        <button class="btn-action" style="width:auto; float:right;" onclick="postIg()">Share</button>
+                        <div style="clear:both;"></div>
+                    </div>
+                    ${posts.map(p => `
+                        <div class="app-card" style="margin-bottom: 1.5rem;">
+                            <div style="font-weight:800; margin-bottom:1rem;">@${p.userEmail.split('@')[0]}</div>
+                            <p style="font-size:1.1rem;">${p.content}</p>
+                            <small style="color:#94a3b8;">${new Date(p.createdAt).toLocaleString()}</small>
+                        </div>
+                    `).join('')}
+                    ${dummyPosts.map(p => `
+                        <div class="app-card" style="margin-bottom: 1.5rem; opacity:0.7;">
+                            <div style="font-weight:800; margin-bottom:1rem;">@${p.user}</div>
+                            <p style="font-size:1.1rem;">${p.text}</p>
+                            <small>Suggested Post</small>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+
+        async function renderVouchers(title, desc) {
+            title.innerText = 'My Vouchers';
+            desc.innerText = 'Claim and use your available discounts.';
+            const res = await fetch(`/api/apps/${appId}/vouchers`);
+            const vData = await res.json();
+            const content = document.getElementById('mainContent');
+            content.innerHTML = `
+                <div class="grid">
+                    ${vData.map(v => `
+                        <div class="app-card" style="border: 2px dashed var(--app-primary);">
+                            <div style="font-weight:800; color:var(--app-primary); font-size:1.5rem;">
+                                ${v.tipe === 'PERSEN' ? (v.nilai*100)+'%' : 'Rp '+v.nilai.toLocaleString()} OFF
+                            </div>
+                            <div style="font-weight:700;">${v.nama}</div>
+                            <p style="font-size:0.875rem; color:#64748b;">Min: Rp ${v.min.toLocaleString()}</p>
+                            <small style="color:#94a3b8;">Exp: ${v.expiryDate || 'Forever'}</small>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function renderHistory(title, desc) {
+            title.innerText = 'Transaction History';
+            desc.innerText = 'View your past activities and orders.';
+            const res = await fetch(`/api/user/riwayat`);
+            const data = await res.json();
+            const content = document.getElementById('mainContent');
+            content.innerHTML = `
+                <div class="app-card" style="padding:0;">
+                    ${data.filter(i => i.includes(`[${currentApp.nama}]`)).map(item => `
+                        <div style="padding:1.5rem; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between;">
+                            <span>${item.split('] ')[2]}</span>
+                            <span style="font-weight:700; color:#10b981;">SUCCESS</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderTopUp(title, desc) {
+            title.innerText = 'Top Up Saldo';
+            desc.innerText = 'Add balance to your digital wallet.';
+            const content = document.getElementById('mainContent');
+            content.innerHTML = `
+                <div class="app-card" style="max-width:500px; margin:0 auto;">
+                    <h3 style="margin-bottom:1.5rem;">Select Amount</h3>
+                    <div class="grid" style="grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:2rem;">
+                        <button class="btn-action" style="background:#f1f5f9; color:#1e293b;" onclick="doTopUp(50000)">Rp 50.000</button>
+                        <button class="btn-action" style="background:#f1f5f9; color:#1e293b;" onclick="doTopUp(100000)">Rp 100.000</button>
+                    </div>
+                    <input type="number" id="customAmt" placeholder="Or enter manual amount" style="width:100%; padding:1rem; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:1rem;">
+                    <button class="btn-action" onclick="doTopUp(document.getElementById('customAmt').value)">Top Up Now</button>
+                    <p style="font-size:0.75rem; color:var(--app-primary); margin-top:1rem; text-align:center;">*Note: Top up will be added to your current balance.</p>
+                </div>
+            `;
+        }
+
+        async function renderProfile(title, desc) {
+            title.innerText = 'My Profile';
+            desc.innerText = 'Manage your account information.';
+            const content = document.getElementById('mainContent');
+            const appName = currentApp.nama;
+
+            if(appName === 'Instagram') {
+                const res = await fetch('/api/apps/posts');
+                const allPosts = await res.json();
+                const myPosts = allPosts.filter(p => p.userEmail === user.email);
+
+                content.innerHTML = `
+                    <div style="max-width:800px; margin:0 auto;">
+                        <div class="app-card" style="text-align:center; margin-bottom:2rem;">
+                            <div style="width:120px; height:120px; background:#ddd; border-radius:50%; margin:0 auto 1.5rem; display:flex; align-items:center; justify-content:center; font-size:4rem;">👤</div>
+                            <h2 style="margin:0;">@${user.email.split('@')[0]}</h2>
+                            <p style="color:#64748b; margin:1rem 0;">Digital Creator | AppVerse Explorer</p>
+                            <div style="display:flex; justify-content:space-around; margin:2rem 0; font-weight:800; border-top:1px solid #f1f5f9; padding-top:1.5rem;">
+                                <div>${myPosts.length}<br><small style="color:#64748b; font-weight:500;">Posts</small></div>
+                                <div>1.2k<br><small style="color:#64748b; font-weight:500;">Followers</small></div>
+                                <div>450<br><small style="color:#64748b; font-weight:500;">Following</small></div>
+                            </div>
+                            <div class="profile-row"><span>Display Name</span><input type="text" id="pN" value="${user.name}" style="border:1px solid #eee; padding:8px; border-radius:8px;"></div>
+                            <button class="btn-action" style="margin-top:1.5rem; width:auto; padding:0.75rem 3rem;" onclick="saveProfile()">Update Profile</button>
+                        </div>
+                        <h3 style="margin-bottom:1.5rem;">My Posts</h3>
+                        <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
+                            ${myPosts.map(p => `
+                                <div style="aspect-ratio: 1/1; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem; display:flex; align-items:center; justify-content:center; text-align:center; font-size:0.875rem; overflow:hidden;">
+                                    ${p.content}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                content.innerHTML = `
+                    <div class="app-card" style="max-width:700px; margin:0 auto;">
+                        <div class="profile-row"><span class="profile-label">Registered Email</span><span class="profile-value">${user.email}</span></div>
+                        <div class="profile-row"><span class="profile-label">Full Name</span><input type="text" id="pN" value="${user.name}" style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; width:60%;"></div>
+                        
+                        ${appName === 'Gojek' ? `
+                            <div class="profile-row">
+                                <span class="profile-label">Phone Number</span>
+                                <input type="text" id="pP" value="${userAppProfile.phone || ''}" placeholder="08xxxx" style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; width:60%;">
+                            </div>
+                        ` : ''}
+                        
+                        ${['Shopee', 'Tokopedia'].includes(appName) ? `
+                            <div class="profile-row">
+                                <span class="profile-label">Shipping Address</span>
+                                <input type="text" id="pA" value="${userAppProfile.address || ''}" placeholder="Enter your full address" style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; width:60%;">
+                            </div>
+                        ` : ''}
+                        
+                        <button class="btn-action" style="margin-top:2.5rem;" onclick="saveProfile()">Save Changes</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('pN').value;
+            const phone = document.getElementById('pP') ? document.getElementById('pP').value : null;
+            const address = document.getElementById('pA') ? document.getElementById('pA').value : null;
+
+            // Save Global Name
+            await fetch('/api/user/update', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ name })
+            });
+
+            // Save App Profile
+            await fetch(`/api/user/profile/${appId}/update`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ phone, address })
+            });
+
+            alert('Profile Saved!');
+            init();
+        }
+
+        // --- ACTIONS ---
+
+        function addToCart(id, name, price) {
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ id, name, price, qty: 1 });
+            }
+            updateCartBadge();
+            alert(`${name} added to cart!`);
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cartBadge');
+            if (badge) {
+                const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+                badge.innerText = totalQty;
+                badge.style.display = totalQty > 0 ? 'block' : 'none';
+            }
+        }
+
+        function renderCart(title, desc) {
+            title.innerText = 'Shopping Cart';
+            desc.innerText = 'Review your items and checkout.';
+            const content = document.getElementById('mainContent');
+            
+            if (cart.length === 0) {
+                content.innerHTML = '<div style="text-align:center; padding:5rem; color:#64748b;">Your cart is empty</div>';
+                return;
+            }
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            window.cartTotal = total;
+
+            content.innerHTML = `
+                <div class="app-card">
+                    ${cart.map((item, index) => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:1.5rem 0; border-bottom:1px solid #f1f5f9;">
+                            <div>
+                                <div style="font-weight:700; font-size:1.15rem;">${item.name}</div>
+                                <div style="color:#64748b;">Rp ${item.price.toLocaleString()} x ${item.qty}</div>
+                            </div>
+                            <div style="display:flex; gap:1.5rem; align-items:center;">
+                                <div style="font-weight:800; font-size:1.25rem;">Rp ${(item.price * item.qty).toLocaleString()}</div>
+                                <button onclick="removeFromCart(${index})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:1.5rem;">&times;</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    
+                    <div style="margin-top:2rem; padding-top:2rem; border-top:2px solid #f1f5f9;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                            <span style="font-size:1.25rem; font-weight:600;">Subtotal</span>
+                            <span style="font-size:1.75rem; font-weight:800; color:var(--app-primary);">Rp ${total.toLocaleString()}</span>
+                        </div>
+                        
+                        <div style="margin-bottom:2rem;">
+                            <label style="display:block; font-weight:700; margin-bottom:0.75rem;">Apply Voucher</label>
+                            <select id="cartVoucher" class="voucher-select" onchange="applyCartVoucher()">
+                            </select>
+                        </div>
+                        
+                        <div id="cartFinalSection" style="margin-bottom:2rem; background:#f8fafc; padding:1.5rem; border-radius:12px; display:none;">
+                            <div style="display:flex; justify-content:space-between; font-size:1.5rem; font-weight:800;">
+                                <span>Total Amount</span>
+                                <span id="cartFinal" style="color:var(--app-primary);">Rp 0</span>
+                            </div>
+                        </div>
+                        
+                        <button class="btn-action" onclick="checkout()">Confirm & Checkout</button>
+                    </div>
+                </div>
+            `;
+            loadVouchersForSelect('cartVoucher');
+        }
+
+        async function loadVouchersForSelect(id) {
+            const res = await fetch(`/api/apps/${appId}/vouchers`);
+            vouchers = await res.json();
+            const el = document.getElementById(id);
+            el.innerHTML = '<option value="">No Voucher</option>' + vouchers.map(v => `<option value="${v.id}" data-val="${v.nilai}" data-type="${v.tipe}">${v.nama}</option>`).join('');
+        }
+
+        function applyCartVoucher() {
+            const opt = document.getElementById('cartVoucher').selectedOptions[0];
+            let f = window.cartTotal;
+            if(opt.value) {
+                if(opt.dataset.type === 'PERSEN') f = f * (1 - parseFloat(opt.dataset.val));
+                else f = f - parseFloat(opt.dataset.val);
+                document.getElementById('cartFinalSection').style.display = 'block';
+            } else {
+                document.getElementById('cartFinalSection').style.display = 'none';
+            }
+            document.getElementById('cartFinal').innerText = `Rp ${Math.max(0, f).toLocaleString()}`;
+            window.finalCartPrice = f;
+        }
+
+        function applyGojekVoucher() {
+            const opt = document.getElementById('gVoucher').selectedOptions[0];
+            let f = window.gBasePrice;
+            if(opt.value) {
+                if(opt.dataset.type === 'PERSEN') f = f * (1 - parseFloat(opt.dataset.val));
+                else f = f - parseFloat(opt.dataset.val);
+            }
+            document.getElementById('gFinal').innerText = `Rp ${Math.max(0, f).toLocaleString()}`;
+            window.finalGPrice = f;
+        }
+
+        function removeFromCart(i) {
+            cart.splice(i, 1);
+            updateCartBadge();
+            showView('cart');
+        }
+
+        async function checkout() {
+            const price = window.finalCartPrice || window.cartTotal;
+            if(userSaldo < price) { alert('Insufficient balance!'); return; }
+            
+            const vId = document.getElementById('cartVoucher').value;
+            
+            const res = await fetch('/api/apps/transfer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: price, activity: 'Checkout Products' })
+            });
+            
+            if(res.ok) { 
+                if(vId) await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                alert('Order Successful!'); 
+                cart = []; 
+                updateCartBadge(); 
+                await updateSaldo(); 
+                showView('history'); 
+            }
+        }
+
+        async function confirmGojek() {
+            const p = window.finalGPrice;
+            if(userSaldo < p) { alert('Insufficient balance!'); return; }
+            
+            const vId = document.getElementById('gVoucher').value;
+            
+            const res = await fetch('/api/apps/transfer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: p, activity: 'GoRide Order' })
+            });
+            
+            if(res.ok) { 
+                if(vId) await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                alert('Driver found! Ride successful.'); 
+                await updateSaldo(); 
+                showView('history'); 
+            }
+        }
+
+        async function doTopUp(a) {
+            if(!a) return;
+            const res = await fetch('/api/user/init-saldo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appId, amount: a })
+            });
+            if(res.ok) { alert('Balance updated!'); await updateSaldo(); showView('home'); }
+        }
+
+        async function postIg() {
+            const c = document.getElementById('igPost').value; if(!c) return;
+            await fetch('/api/apps/posts', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({content: c})
+            });
+            showView('home');
+        }
+
+        init();
+    </script>
+</body>
+</html>

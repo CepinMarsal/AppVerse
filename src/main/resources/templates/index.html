@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Identitas - Secure Corporate Authentication</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="gradient-bg"></div>
+
+    <nav class="nav">
+        <div class="logo">SISTEM IDENTITAS</div>
+        <div style="display: flex; gap: 0.75rem;">
+            <a th:href="@{/login}" class="btn btn-outline">Sign In</a>
+            <a th:href="@{/register}" class="btn btn-primary">Get Started</a>
+        </div>
+    </nav>
+
+    <main class="container" style="padding-top: 6rem; text-align: center;">
+        <div class="animate-in">
+            <span class="status-pill" style="margin-bottom: 1.5rem;">NEXT-GEN BIOMETRIC SECURITY</span>
+            <h1
+                style="font-size: 3.5rem; max-width: 900px; margin: 0 auto 1.5rem; line-height: 1.2; color: var(--text);">
+                Modern Identity Management for the <span style="color: var(--primary);">Digital Enterprise.</span>
+            </h1>
+            <p style="font-size: 1.25rem; color: var(--text-muted); max-width: 650px; margin: 0 auto 2.5rem;">
+                Secure your corporate ecosystem with our advanced biometric identification system. Centralized access
+                control and unified balance management.
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 6rem;">
+                <a th:href="@{/register}" class="btn btn-primary"
+                    style="padding: 0.875rem 2rem; font-size: 1rem;">Create Business Account</a>
+                <a href="#features" class="btn btn-outline" style="padding: 0.875rem 2rem; font-size: 1rem;">View
+                    Solutions</a>
+            </div>
+        </div>
+
+        <div class="grid" id="features">
+            <div class="glass-card animate-in" style="animation-delay: 0.1s; text-align: left;">
+                <div class="card-title">Security</div>
+                <h3>Enterprise Biometrics</h3>
+                <p style="color: var(--text-muted);">Military-grade fingerprint encryption to protect sensitive
+                    corporate data and user privacy.</p>
+            </div>
+            <div class="glass-card animate-in" style="animation-delay: 0.2s; text-align: left;">
+                <div class="card-title" style="color: var(--secondary);">Integration</div>
+                <h3>Unified Ecosystem</h3>
+                <p style="color: var(--text-muted);">Seamlessly connect with your existing infrastructure and manage
+                    digital assets in one dashboard.</p>
+            </div>
+            <div class="glass-card animate-in" style="animation-delay: 0.3s; text-align: left;">
+                <div class="card-title" style="color: var(--accent);">Efficiency</div>
+                <h3>Automated Workflow</h3>
+                <p style="color: var(--text-muted);">Streamline authentication processes and reduce operational overhead
+                    with smart automated tools.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer
+        style="margin-top: 8rem; padding: 4rem 2rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+        <p>&copy; 2024 Sistem Identitas Korporasi. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>
