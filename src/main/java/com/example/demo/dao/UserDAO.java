@@ -15,7 +15,7 @@ import java.util.List;
 public class UserDAO {
 
     public User insert(User user) throws SQLException {
-        String sql = "INSERT INTO users (nama, email, fingerprint, active, phone, address) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO users (name, email, fingerprint, active, phone, address) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -81,7 +81,7 @@ public class UserDAO {
 
     public boolean updateProfile(String email, String name, String phone, String address) throws SQLException {
         StringBuilder sql = new StringBuilder("UPDATE users SET email = email ");
-        if (name != null) sql.append(", nama = ? ");
+        if (name != null) sql.append(", name = ? ");
         if (phone != null) sql.append(", phone = ? ");
         if (address != null) sql.append(", address = ? ");
         sql.append(" WHERE email = ?");
@@ -109,7 +109,7 @@ public class UserDAO {
     }
 
     private User mapRow(ResultSet rs) throws SQLException {
-        String name = rs.getString("nama");
+        String name = rs.getString("name");
         String email = rs.getString("email");
         String fingerprint = rs.getString("fingerprint");
         boolean active = rs.getBoolean("active");
