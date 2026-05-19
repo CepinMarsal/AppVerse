@@ -584,6 +584,13 @@
                             <span style="font-size:1.75rem; font-weight:800; color:var(--app-primary);">Rp ${total.toLocaleString()}</span>
                         </div>
                         
+                        ${['Shopee', 'Tokopedia'].includes(currentApp.nama) ? `
+                        <div style="margin-bottom:1.5rem;">
+                            <label style="display:block; font-weight:700; margin-bottom:0.75rem;">Delivery Distance (km)</label>
+                            <input type="number" id="cartDistance" min="1" placeholder="Enter distance in km" oninput="applyCartVoucher()" style="width:100%; padding:1rem; border-radius:12px; border:1px solid #e2e8f0;">
+                        </div>
+                        ` : ''}
+
                         <div style="margin-bottom:2rem;">
                             <label style="display:block; font-weight:700; margin-bottom:0.75rem;">Apply Voucher</label>
                             <select id="cartVoucher" class="voucher-select" onchange="applyCartVoucher()">
@@ -591,6 +598,10 @@
                         </div>
                         
                         <div id="cartFinalSection" style="margin-bottom:2rem; background:#f8fafc; padding:1.5rem; border-radius:12px; display:none;">
+                            <div style="display:none; justify-content:space-between; font-size:1.15rem; margin-bottom:0.5rem;" id="ongkirRow">
+                                <span>Shipping Cost</span>
+                                <span id="cartOngkirLabel">Rp 0</span>
+                            </div>
                             <div style="display:flex; justify-content:space-between; font-size:1.5rem; font-weight:800;">
                                 <span>Total Amount</span>
                                 <span id="cartFinal" style="color:var(--app-primary);">Rp 0</span>
@@ -608,27 +619,62 @@
             const res = await fetch(`/api/apps/${appId}/vouchers`);
             vouchers = await res.json();
             const el = document.getElementById(id);
-            el.innerHTML = '<option value="">No Voucher</option>' + vouchers.map(v => `<option value="${v.id}" data-val="${v.nilai}" data-type="${v.tipe}">${v.nama}</option>`).join('');
+            el.innerHTML = '<option value="">No Voucher</option>' + vouchers.map(v => `<option value="${v.id}" data-val="${v.nilai}" data-type="${v.tipe}" data-min="${v.min}">${v.nama}</option>`).join('');
         }
 
         function applyCartVoucher() {
             const opt = document.getElementById('cartVoucher').selectedOptions[0];
             let f = window.cartTotal;
-            if(opt.value) {
+            
+            let ongkir = 0;
+            const distInput = document.getElementById('cartDistance');
+            if (distInput) {
+                const dist = parseFloat(distInput.value) || 0;
+                ongkir = dist * 5000;
+                document.getElementById('cartOngkirLabel').innerText = 'Rp ' + ongkir.toLocaleString();
+            }
+
+            if(opt && opt.value) {
+                const min = parseFloat(opt.dataset.min) || 0;
+                if (window.cartTotal < min) {
+                    alert('Minimum transaction for this voucher is Rp ' + min.toLocaleString());
+                    document.getElementById('cartVoucher').value = '';
+                    document.getElementById('cartFinalSection').style.display = ongkir > 0 ? 'block' : 'none';
+                    f = f + ongkir;
+                    document.getElementById('cartFinal').innerText = `Rp ${f.toLocaleString()}`;
+                    window.finalCartPrice = f;
+                    return;
+                }
                 if(opt.dataset.type === 'PERSEN') f = f * (1 - parseFloat(opt.dataset.val));
                 else f = f - parseFloat(opt.dataset.val);
+            }
+            
+            f = f + ongkir;
+
+            if ((opt && opt.value) || ongkir > 0) {
                 document.getElementById('cartFinalSection').style.display = 'block';
+                const ongkirRow = document.getElementById('ongkirRow');
+                if (ongkirRow) ongkirRow.style.display = ongkir > 0 ? 'flex' : 'none';
             } else {
                 document.getElementById('cartFinalSection').style.display = 'none';
             }
+            
             document.getElementById('cartFinal').innerText = `Rp ${Math.max(0, f).toLocaleString()}`;
-            window.finalCartPrice = f;
+            window.finalCartPrice = Math.max(0, f);
         }
 
         function applyGojekVoucher() {
             const opt = document.getElementById('gVoucher').selectedOptions[0];
             let f = window.gBasePrice;
             if(opt.value) {
+                const min = parseFloat(opt.dataset.min) || 0;
+                if (window.gBasePrice < min) {
+                    alert('Minimum transaction for this voucher is Rp ' + min.toLocaleString());
+                    document.getElementById('gVoucher').value = '';
+                    document.getElementById('gFinal').innerText = `Rp ${f.toLocaleString()}`;
+                    window.finalGPrice = f;
+                    return;
+                }
                 if(opt.dataset.type === 'PERSEN') f = f * (1 - parseFloat(opt.dataset.val));
                 else f = f - parseFloat(opt.dataset.val);
             }
@@ -655,8 +701,12 @@
             });
             
             if(res.ok) { 
-                if(vId) await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
-                alert('Order Successful!'); 
+                let msg = 'Order Successful!';
+                if(vId) {
+                    await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                    msg += '\nVoucher applied successfully!';
+                }
+                alert(msg); 
                 cart = []; 
                 updateCartBadge(); 
                 await updateSaldo(); 
@@ -677,8 +727,12 @@
             });
             
             if(res.ok) { 
-                if(vId) await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
-                alert('Driver found! Ride successful.'); 
+                let msg = 'Driver found! Ride successful.';
+                if(vId) {
+                    await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                    msg += '\nVoucher applied successfully!';
+                }
+                alert(msg); 
                 await updateSaldo(); 
                 showView('history'); 
             }
