@@ -11,6 +11,32 @@
             --app-primary: #2563EB;
             --sidebar-width: 280px;
         }
+
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+        }
+        @keyframes fadeInUp {
+            from { opacity:0; transform:translateY(10px); }
+            to { opacity:1; transform:translateY(0); }
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .modal-card {
+            background: white; border-radius: 16px; padding: 2rem; width: 100%; max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            animation: fadeInUp 0.3s ease;
+        }
+        .qty-controls { display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; }
+        .qty-btn { background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 8px; font-weight: 800; font-size: 1.25rem; cursor: pointer; color: #1e293b; }
+        .qty-btn:hover { background: #e2e8f0; }
+        .qty-input { width: 60px; height: 40px; text-align: center; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 700; font-size: 1.125rem; }
+
         body { background: #f1f5f9; padding: 0; display: flex; min-height: 100vh; font-family: 'Inter', sans-serif; margin:0; }
         
         /* Layout */
@@ -127,6 +153,26 @@
         <div id="mainContent"></div>
     </main>
 
+    <!-- Cart Modal -->
+    <div class="modal-overlay" id="cartModal">
+        <div class="modal-card">
+            <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.25rem; font-weight: 800;" id="modalProductName">Product Name</h3>
+            <div style="color: var(--app-primary); font-weight: 700; font-size: 1.125rem;" id="modalProductPrice">Rp 0</div>
+            
+            <div class="qty-controls">
+                <button class="qty-btn" onclick="updateModalQty(-1)">-</button>
+                <input type="number" id="modalQty" class="qty-input" value="1" min="1" readonly>
+                <button class="qty-btn" onclick="updateModalQty(1)">+</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 2rem;">
+                <button class="btn-action" style="background: var(--app-primary);" onclick="confirmPersonalCart()">🛒 Tambah ke Keranjang Pribadi</button>
+                <button class="btn-action" style="background: #10b981; display: none;" id="btnGroupCartModal" onclick="confirmGroupCart()">👥 Tambah ke Group Cart</button>
+                <button class="btn-action" style="background: #f1f5f9; color: #64748b;" onclick="closeCartModal()">Batal</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const pathParts = window.location.pathname.split('/');
         const appId = parseInt(pathParts[pathParts.length - 1]);
@@ -186,7 +232,8 @@
 
             if (appName === 'Shopee' || appName === 'Tokopedia' || appName === 'Fore' || appName === 'Janji Jiwa') {
                 items.splice(1, 0, { id: 'cart', label: 'My Cart', badge: true });
-                items.splice(2, 0, { id: 'vouchers', label: 'Vouchers' });
+                items.splice(2, 0, { id: 'groupcart', label: 'Group Cart', inviteBadge: true });
+                items.splice(3, 0, { id: 'vouchers', label: 'Vouchers' });
             } else if (appName === 'Gojek') {
                 items.splice(1, 0, { id: 'vouchers', label: 'My Vouchers' });
             }
@@ -195,9 +242,11 @@
                 <div class="menu-item" id="nav-${item.id}" onclick="showView('${item.id}')">
                     ${item.label}
                     ${item.badge ? `<span class="cart-badge" id="cartBadge">0</span>` : ''}
+                    ${item.inviteBadge ? `<span class="cart-badge" id="inviteBadge" style="background:#f59e0b; display:none;">!</span>` : ''}
                 </div>
             `).join('');
             updateCartBadge();
+            checkPendingInvites();
         }
 
         async function showView(view) {
@@ -215,11 +264,15 @@
                 headerSaldo.style.display = 'flex';
             }
 
+            // activeGrupId tidak di-reset agar user bisa pindah ke Home/Catalog untuk menambah item ke grup
+            // if (view !== 'groupcart') activeGrupId = null;
+
             if (view === 'home') {
                 if (currentApp.nama === 'Gojek') { renderGojek(title, desc); }
                 else if (currentApp.nama === 'Instagram') { renderInstagram(title, desc); }
                 else { renderShop(title, desc); }
             } else if (view === 'cart') { renderCart(title, desc); }
+            else if (view === 'groupcart') { renderGroupCart(title, desc); }
             else if (view === 'vouchers') { renderVouchers(title, desc); }
             else if (view === 'history') { renderHistory(title, desc); }
             else if (view === 'topup') { renderTopUp(title, desc); }
@@ -486,17 +539,7 @@
         }
 
         // --- ACTIONS ---
-
-        function addToCart(id, name, price) {
-            const existing = cart.find(item => item.id === id);
-            if (existing) {
-                existing.qty++;
-            } else {
-                cart.push({ id, name, price, qty: 1 });
-            }
-            updateCartBadge();
-            alert(`${name} added to cart!`);
-        }
+        // addToCart & addToPersonalCart didefinisikan di bagian GROUP CART di bawah
 
         function updateCartBadge() {
             const badge = document.getElementById('cartBadge');
@@ -658,6 +701,329 @@
                 body: JSON.stringify({content: c})
             });
             showView('home');
+        }
+
+        // ===================== GROUP CART =====================
+
+        let activeGrupId = null;
+
+        async function checkPendingInvites() {
+            try {
+                const res = await fetch('/api/grup-keranjang/invites');
+                const invites = await res.json();
+                const pending = invites.filter(g => Number(g.appId) === appId);
+                const badge = document.getElementById('inviteBadge');
+                if (badge) badge.style.display = pending.length > 0 ? 'inline-block' : 'none';
+            } catch(e) {}
+        }
+
+        async function renderGroupCart(title, desc) {
+            title.innerText = 'Group Cart';
+            desc.innerText = 'Belanja bareng teman dalam satu keranjang.';
+            const content = document.getElementById('mainContent');
+
+            const [grupsRes, invitesRes] = await Promise.all([
+                fetch(`/api/grup-keranjang/active?appId=${appId}`),
+                fetch('/api/grup-keranjang/invites')
+            ]);
+            const grups = await grupsRes.json();
+            const invites = await invitesRes.json();
+            // Filter invites berdasarkan appId yang cocok (cast ke Number karena JSON int)
+            const pendingInvites = invites.filter(g => Number(g.appId) === appId);
+
+            // Update badge
+            const badge = document.getElementById('inviteBadge');
+            if (badge) badge.style.display = pendingInvites.length > 0 ? 'inline-block' : 'none';
+
+            content.innerHTML = `
+                <div style="display:grid; grid-template-columns:320px 1fr; gap:2rem; align-items:start;">
+                    <div>
+                        ${pendingInvites.length > 0 ? `
+                        <div class="app-card" style="margin-bottom:1.5rem; border:2px solid #f59e0b; animation: pulse-border 2s infinite;">
+                            <div style="font-weight:800; margin-bottom:1rem; color:#f59e0b;">🔔 Undangan Masuk (${pendingInvites.length})</div>
+                            ${pendingInvites.map(g => `
+                                <div style="padding:1rem; background:#fffbeb; border-radius:12px; margin-bottom:0.75rem;">
+                                    <div style="font-weight:700; margin-bottom:0.25rem;">Grup #${g.id} &bull; <span style="font-family:monospace; color:var(--app-primary);">${g.kodeGrup}</span></div>
+                                    <div style="font-size:0.8rem; color:#64748b; margin-bottom:0.75rem;">Diundang oleh: <b>${g.ownerEmail.split('@')[0]}</b></div>
+                                    <div style="display:flex; gap:0.5rem;">
+                                        <button class="btn-action" style="background:#10b981; padding:0.5rem 1rem; font-size:0.85rem;" onclick="respondInvite(${g.id}, 'ACCEPT')">✓ Terima</button>
+                                        <button class="btn-action" style="background:#ef4444; padding:0.5rem 1rem; font-size:0.85rem;" onclick="respondInvite(${g.id}, 'REJECT')">✕ Tolak</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>` : ''}
+
+                        <div class="app-card" style="margin-bottom:1.5rem;">
+                            <div style="font-weight:800; margin-bottom:1rem;">Buat Grup Baru</div>
+                            <p style="font-size:0.85rem; color:#64748b; margin-bottom:1rem;">Buat keranjang bersama dan undang teman untuk belanja bareng.</p>
+                            <button class="btn-action" onclick="createGrup()">+ Buat Group Cart</button>
+                        </div>
+
+                        <div class="app-card">
+                            <div style="font-weight:800; margin-bottom:1rem;">Grup Aktif Saya (${grups.length})</div>
+                            ${grups.length === 0 ? '<p style="color:#94a3b8; font-size:0.875rem;">Belum ada grup aktif.<br>Buat grup baru atau tunggu undangan.</p>' : ''}
+                            ${grups.map(g => `
+                                <div style="padding:1rem; border:2px solid ${activeGrupId===g.id?'var(--app-primary)':'#e2e8f0'}; border-radius:12px; margin-bottom:0.75rem; cursor:pointer; transition:all 0.2s;"
+                                     onclick="openGrup(${g.id})"
+                                     onmouseenter="this.style.borderColor='var(--app-primary)'"
+                                     onmouseleave="this.style.borderColor='${activeGrupId===g.id?'var(--app-primary)':'#e2e8f0'}'"
+                                     >
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <div style="font-weight:700;">Grup #${g.id}</div>
+                                        <span style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:20px; background:${g.ownerEmail===user.email?'#dbeafe':'#f0fdf4'}; color:${g.ownerEmail===user.email?'#1d4ed8':'#16a34a'};">${g.ownerEmail===user.email?'OWNER':'MEMBER'}</span>
+                                    </div>
+                                    <div style="font-size:0.75rem; color:#64748b; margin-top:0.25rem;">Kode: <b style="font-family:monospace; color:var(--app-primary); letter-spacing:0.1em;">${g.kodeGrup}</b></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div id="grupDetail">
+                        <div class="app-card" style="text-align:center; padding:4rem; color:#94a3b8;">
+                            <div style="font-size:3rem; margin-bottom:1rem;">🛒</div>
+                            <div style="font-weight:600;">Pilih grup untuk melihat detail</div>
+                            <div style="font-size:0.875rem; margin-top:0.5rem;">Atau buat grup baru untuk mulai belanja bersama</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Auto-open grup yang terakhir aktif
+            if (activeGrupId && grups.find(g => g.id === activeGrupId)) {
+                openGrup(activeGrupId);
+            }
+        }
+
+        async function createGrup() {
+            const res = await fetch('/api/grup-keranjang/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appId })
+            });
+            if (res.ok) {
+                const grup = await res.json();
+                alert('Grup berhasil dibuat!\nKode Grup: ' + grup.kodeGrup + '\nBagikan kode ini ke teman kamu.');
+                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+            }
+        }
+
+        async function openGrup(grupId) {
+            activeGrupId = grupId;
+            const res = await fetch('/api/grup-keranjang/' + grupId);
+            if (!res.ok) { alert('Gagal memuat detail grup'); return; }
+            const grup = await res.json();
+
+            const isOwner = grup.ownerEmail === user.email;
+            const totalGrup = grup.items.reduce((s, i) => s + i.productHarga * i.qty, 0);
+
+            const perMember = {};
+            grup.items.forEach(i => {
+                perMember[i.addedByEmail] = (perMember[i.addedByEmail] || 0) + i.productHarga * i.qty;
+            });
+
+            const memberBadges = grup.members.map(m =>
+                '<span style="padding:0.375rem 0.875rem; border-radius:20px; font-size:0.8rem; font-weight:600;' +
+                'background:' + (m.status==='ACCEPTED'?'#dbeafe':m.status==='PENDING'?'#fef9c3':'#fee2e2') + ';' +
+                'color:' + (m.status==='ACCEPTED'?'#1d4ed8':m.status==='PENDING'?'#a16207':'#dc2626') + ';">' +
+                (m.userEmail===grup.ownerEmail?'[Owner] ':'') + m.userEmail.split('@')[0] +
+                ' (' + m.status + ')</span>'
+            ).join('');
+
+            const itemRows = grup.items.map(item =>
+                '<div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 0; border-bottom:1px solid #f1f5f9;">' +
+                '<div><div style="font-weight:700;">' + item.productNama + '</div>' +
+                '<div style="font-size:0.8rem; color:#64748b;">Rp ' + item.productHarga.toLocaleString() + ' x ' + item.qty +
+                ' | oleh ' + item.addedByEmail.split('@')[0] + '</div></div>' +
+                '<div style="display:flex; align-items:center; gap:1rem;">' +
+                '<span style="font-weight:800;">Rp ' + (item.productHarga*item.qty).toLocaleString() + '</span>' +
+                (item.addedByEmail === user.email && grup.status === 'ACTIVE' ?
+                    '<button onclick="removeGrupItem(' + grup.id + ',' + item.id + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1.25rem;">&times;</button>' : '') +
+                '</div></div>'
+            ).join('');
+
+            const perMemberRows = Object.entries(perMember).map(([email, total]) =>
+                '<div style="display:flex; justify-content:space-between; padding:0.5rem 0; color:#64748b;">' +
+                '<span>' + email.split('@')[0] + '</span>' +
+                '<span style="font-weight:700; color:#1e293b;">Rp ' + total.toLocaleString() + '</span></div>'
+            ).join('');
+
+            document.getElementById('grupDetail').innerHTML =
+                '<div class="app-card" style="margin-bottom:1.5rem;">' +
+                '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem;">' +
+                '<div><div style="font-size:1.5rem; font-weight:800;">Grup #' + grup.id + '</div>' +
+                '<div style="color:#64748b;">Kode: <b style="color:var(--app-primary);">' + grup.kodeGrup + '</b></div></div>' +
+                '<span style="background:' + (grup.status==='ACTIVE'?'#dcfce7':'#f1f5f9') + '; color:' + (grup.status==='ACTIVE'?'#16a34a':'#64748b') + '; padding:0.25rem 0.75rem; border-radius:20px; font-size:0.75rem; font-weight:700;">' + grup.status + '</span>' +
+                '</div>' +
+                '<div style="margin-bottom:1.5rem;"><div style="font-weight:700; margin-bottom:0.75rem;">Member (' + grup.members.length + ')</div>' +
+                '<div style="display:flex; flex-wrap:wrap; gap:0.5rem;">' + memberBadges + '</div></div>' +
+                (isOwner && grup.status === 'ACTIVE' ?
+                    '<div style="display:flex; gap:0.75rem; margin-bottom:1.5rem;">' +
+                    '<input type="email" id="inviteEmail" placeholder="Email teman yang diundang" style="flex:1; padding:0.75rem 1rem; border:1px solid #e2e8f0; border-radius:12px;">' +
+                    '<button class="btn-action" style="width:auto; padding:0.75rem 1.5rem;" onclick="inviteUser(' + grup.id + ')">Undang</button>' +
+                    '</div>' : '') +
+                '</div>' +
+                '<div class="app-card" style="margin-bottom:1.5rem;">' +
+                '<div style="font-weight:800; margin-bottom:1rem;">Item Keranjang (' + grup.items.length + ')</div>' +
+                (grup.items.length === 0 ? '<p style="color:#94a3b8;">Belum ada item. Tambah dari halaman produk!</p>' : '') +
+                itemRows +
+                (grup.items.length > 0 ?
+                    '<div style="margin-top:1.5rem; padding-top:1rem; border-top:2px solid #f1f5f9;">' +
+                    '<div style="font-weight:700; margin-bottom:0.75rem;">Rincian per Member:</div>' +
+                    perMemberRows +
+                    '<div style="display:flex; justify-content:space-between; padding:1rem 0; border-top:1px solid #e2e8f0; font-size:1.25rem; font-weight:800;">' +
+                    '<span>Total Grup</span><span style="color:var(--app-primary);">Rp ' + totalGrup.toLocaleString() + '</span></div>' +
+                    '</div>' : '') +
+                '</div>' +
+                (isOwner && grup.status === 'ACTIVE' && grup.items.length > 0 ?
+                    '<button class="btn-action" onclick="checkoutGrup(' + grup.id + ')">Checkout Grup (Traktir Semua Anggota)</button>' : '');
+        }
+
+        async function inviteUser(grupId) {
+            const email = document.getElementById('inviteEmail').value.trim();
+            if (!email) { alert('Masukkan email terlebih dahulu'); return; }
+
+            const btn = document.querySelector('#inviteEmail + button');
+            if (btn) { btn.disabled = true; btn.innerText = 'Mengirim...'; }
+
+            const res = await fetch('/api/grup-keranjang/' + grupId + '/invite', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email })
+            });
+            const text = await res.text();
+
+            if (btn) { btn.disabled = false; btn.innerText = 'Undang'; }
+
+            if (res.ok) {
+                document.getElementById('inviteEmail').value = '';
+                showInviteSuccess(email);
+                openGrup(grupId);
+            } else {
+                let msg = text;
+                try { msg = JSON.parse(text); } catch(e) {}
+                alert('Gagal: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
+            }
+        }
+
+        function showInviteSuccess(email) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed; bottom:2rem; right:2rem; background:#10b981; color:white; padding:1rem 1.5rem; border-radius:12px; font-weight:700; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,0.15); animation:fadeInUp 0.3s ease;';
+            toast.innerText = '✓ Undangan terkirim ke ' + email;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        async function respondInvite(grupId, action) {
+            const res = await fetch('/api/grup-keranjang/' + grupId + '/respond', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action })
+            });
+            if (res.ok) {
+                alert(action === 'ACCEPT' ? 'Kamu bergabung ke grup!' : 'Undangan ditolak');
+                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+            }
+        }
+
+        async function removeGrupItem(grupId, itemId) {
+            if (!confirm('Hapus item ini dari grup?')) return;
+            const res = await fetch('/api/grup-keranjang/' + grupId + '/items/' + itemId, { method: 'DELETE' });
+            if (res.ok) openGrup(grupId);
+        }
+
+        async function checkoutGrup(grupId) {
+            if (!confirm('Checkout grup? Sebagai owner, Anda akan membayar (mentraktir) seluruh item di keranjang ini.')) return;
+            const res = await fetch('/api/grup-keranjang/' + grupId + '/checkout', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                let msg = data.message + '\n\nTotal Dibayar: Rp ' + (data.grandTotal ? data.grandTotal.toLocaleString() : '0');
+                alert(msg);
+                await updateSaldo();
+                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+            } else {
+                alert('Gagal: ' + (data.message || JSON.stringify(data)));
+            }
+        }
+
+        // Private cart function (tidak boleh di-override)
+        function addToPersonalCart(id, name, price, qty) {
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                cart.push({ id, name, price, qty: qty });
+            }
+            updateCartBadge();
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed; bottom:2rem; right:2rem; background:var(--app-primary); color:white; padding:1rem 1.5rem; border-radius:12px; font-weight:700; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,0.15); animation:fadeInUp 0.3s ease;';
+            toast.innerText = `🛒 ${name} (${qty}x) ditambahkan ke keranjang pribadi!`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+
+        let tempCartItem = null;
+
+        function addToCart(id, name, price) {
+            tempCartItem = { id, name, price };
+            document.getElementById('modalProductName').innerText = name;
+            document.getElementById('modalProductPrice').innerText = 'Rp ' + price.toLocaleString();
+            document.getElementById('modalQty').value = 1;
+            
+            const btnGroup = document.getElementById('btnGroupCartModal');
+            if (activeGrupId) {
+                btnGroup.style.display = 'block';
+                btnGroup.innerText = `👥 Tambah ke Group Cart #${activeGrupId}`;
+            } else {
+                btnGroup.style.display = 'none';
+            }
+            
+            document.getElementById('cartModal').style.display = 'flex';
+        }
+
+        function updateModalQty(change) {
+            const input = document.getElementById('modalQty');
+            let val = parseInt(input.value) + change;
+            if (val < 1) val = 1;
+            input.value = val;
+        }
+
+        function closeCartModal() {
+            document.getElementById('cartModal').style.display = 'none';
+            tempCartItem = null;
+        }
+
+        function confirmPersonalCart() {
+            if (!tempCartItem) return;
+            const qty = parseInt(document.getElementById('modalQty').value) || 1;
+            addToPersonalCart(tempCartItem.id, tempCartItem.name, tempCartItem.price, qty);
+            closeCartModal();
+        }
+
+        function confirmGroupCart() {
+            if (!tempCartItem || !activeGrupId) return;
+            const qty = parseInt(document.getElementById('modalQty').value) || 1;
+            addToGrupCart(activeGrupId, tempCartItem.id, tempCartItem.name, tempCartItem.price, qty);
+            closeCartModal();
+        }
+
+        async function addToGrupCart(grupId, productId, productNama, productHarga, qty) {
+            const res = await fetch('/api/grup-keranjang/' + grupId + '/items', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ productId, productNama, productHarga, qty })
+            });
+            if (res.ok) {
+                const toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed; bottom:2rem; right:2rem; background:#10b981; color:white; padding:1rem 1.5rem; border-radius:12px; font-weight:700; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,0.15); animation:fadeInUp 0.3s ease;';
+                toast.innerText = `👥 ${productNama} (${qty}x) → Group Cart #${grupId}`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2500);
+                // Refresh detail grup jika sedang dibuka
+                const detail = document.getElementById('grupDetail');
+                if (detail && activeGrupId === grupId) openGrup(grupId);
+            } else {
+                alert('Gagal menambahkan ke Group Cart');
+            }
         }
 
         init();
