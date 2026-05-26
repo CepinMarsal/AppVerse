@@ -11,8 +11,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 
-public class LoginTest {
-
+public class RegisterEmptyInputTest {
     WebDriver driver;
 
     @BeforeEach
@@ -23,21 +22,17 @@ public class LoginTest {
     }
 
     @Test
-    public void testLogin() throws InterruptedException {
-        driver.get("http://localhost:8080/login");
+    public void testRegisterEmptyInput() throws InterruptedException {
+        driver.get("http://localhost:8080/register");
 
-        WebElement email =
-                driver.findElement(By.id("email"));
-        WebElement fingerprint =
-                driver.findElement(By.id("fingerprint"));
         WebElement button =
-                driver.findElement(By.className("btn-primary"));
+                driver.findElement(
+                    By.cssSelector("button[type='submit']")
+                );
 
-        email.sendKeys("jul@gmail.com");
-        fingerprint.sendKeys("123");
         button.click();
         Thread.sleep(3000);
-        System.out.println("LOGIN TEST BERHASIL");
+        System.out.println("REGISTER INPUT KOSONG BERHASIL DIUJI");
     }
 
     @AfterEach
