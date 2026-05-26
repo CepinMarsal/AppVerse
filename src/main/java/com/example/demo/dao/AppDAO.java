@@ -69,6 +69,9 @@ public class AppDAO {
             stmt.execute("CREATE TABLE IF NOT EXISTS posts (id INT AUTO_INCREMENT PRIMARY KEY, user_email VARCHAR(255), content TEXT, image_url VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             
             stmt.execute("CREATE TABLE IF NOT EXISTS app_profiles (user_email VARCHAR(255), app_id INT, phone VARCHAR(20), address TEXT, PRIMARY KEY(user_email, app_id))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS grup_keranjang (id INT AUTO_INCREMENT PRIMARY KEY, kode_grup VARCHAR(20) UNIQUE, owner_email VARCHAR(255), app_id INT, status VARCHAR(20) DEFAULT 'ACTIVE', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS grup_keranjang_member (id INT AUTO_INCREMENT PRIMARY KEY, grup_id INT, user_email VARCHAR(255), status VARCHAR(20) DEFAULT 'PENDING', UNIQUE KEY uq_grup_member (grup_id, user_email))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS grup_keranjang_item (id INT AUTO_INCREMENT PRIMARY KEY, grup_id INT, added_by_email VARCHAR(255), product_id INT, product_nama VARCHAR(255), product_harga DOUBLE, qty INT DEFAULT 1)");
 
             initializeApps(conn);
             initializeProducts(conn);
