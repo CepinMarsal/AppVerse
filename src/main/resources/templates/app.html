@@ -165,8 +165,13 @@
                 <button class="qty-btn" onclick="updateModalQty(1)">+</button>
             </div>
 
+            <div id="modalGroupSelectWrapper" style="display:none; flex-direction:column; gap:0.5rem; margin-top:1rem;">
+                <label for="modalGroupSelect" style="font-weight:700;">Pilih Group Cart</label>
+                <select id="modalGroupSelect" style="padding:0.85rem 1rem; border-radius:12px; border:1px solid #e2e8f0; width:100%;" onchange="handleModalGroupChange()"></select>
+            </div>
+
             <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 2rem;">
-                <button class="btn-action" style="background: var(--app-primary);" onclick="confirmPersonalCart()">🛒 Tambah ke Keranjang Pribadi</button>
+                <button id="btnPersonalCartModal" class="btn-action" style="background: var(--app-primary);" onclick="confirmPersonalCart()">🛒 Tambah ke Keranjang Pribadi</button>
                 <button class="btn-action" style="background: #10b981; display: none;" id="btnGroupCartModal" onclick="confirmGroupCart()">👥 Tambah ke Group Cart</button>
                 <button class="btn-action" style="background: #f1f5f9; color: #64748b;" onclick="closeCartModal()">Batal</button>
             </div>
@@ -182,6 +187,10 @@
         let userSaldo = 0;
         let cart = [];
         let vouchers = [];
+        let activeGrups = [];
+        let selectedModalGrupId = null;
+        let groupCatalogProducts = [];
+        let currentView = 'home';
 
         let userAppProfile = {};
 
@@ -230,7 +239,10 @@
                 items.push({ id: 'history', label: 'History' });
             }
 
-            if (appName === 'Shopee' || appName === 'Tokopedia' || appName === 'Fore' || appName === 'Janji Jiwa') {
+            if (appName === 'Shopee' || appName === 'Tokopedia') {
+                items.splice(1, 0, { id: 'cart', label: 'My Cart', badge: true });
+                items.splice(2, 0, { id: 'vouchers', label: 'Vouchers' });
+            } else if (appName === 'Fore' || appName === 'Janji Jiwa') {
                 items.splice(1, 0, { id: 'cart', label: 'My Cart', badge: true });
                 items.splice(2, 0, { id: 'groupcart', label: 'Group Cart', inviteBadge: true });
                 items.splice(3, 0, { id: 'vouchers', label: 'Vouchers' });
@@ -250,6 +262,7 @@
         }
 
         async function showView(view) {
+            currentView = view;
             document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
             const activeNav = document.getElementById(`nav-${view}`);
             if(activeNav) activeNav.classList.add('active');
@@ -346,17 +359,27 @@
         }
 
         function calcGojek() {
-            const dest = document.getElementById('dest').value;
+            const dest = document.getElementById('dest').value.trim();
             const card = document.getElementById('gojekOrderCard');
             if(dest.length > 2) {
                 card.style.display = 'block';
-                const dist = (Math.random() * 10 + 1).toFixed(1);
+                const dist = estimateDistanceFromAddress(dest);
                 const price = Math.floor(dist * 3000 + 5000);
-                document.getElementById('gDist').innerText = dist + ' km';
+                document.getElementById('gDist').innerText = dist.toFixed(1) + ' km';
                 document.getElementById('gPrice').innerText = 'Rp ' + price.toLocaleString();
                 window.gBasePrice = price;
                 applyGojekVoucher();
             } else { card.style.display = 'none'; }
+        }
+
+        function estimateDistanceFromAddress(address) {
+            const normalized = address.trim().toLowerCase();
+            let hash = 0;
+            for (let i = 0; i < normalized.length; i++) {
+                hash += normalized.charCodeAt(i) * (i + 1);
+            }
+            const rawDist = ((hash % 120) / 10) + 2;
+            return Math.max(1, Math.min(20, parseFloat(rawDist.toFixed(1))));
         }
 
         async function renderInstagram(title, desc) {
@@ -586,8 +609,11 @@
                         
                         ${['Shopee', 'Tokopedia'].includes(currentApp.nama) ? `
                         <div style="margin-bottom:1.5rem;">
-                            <label style="display:block; font-weight:700; margin-bottom:0.75rem;">Delivery Distance (km)</label>
-                            <input type="number" id="cartDistance" min="1" placeholder="Enter distance in km" oninput="applyCartVoucher()" style="width:100%; padding:1rem; border-radius:12px; border:1px solid #e2e8f0;">
+                            <label style="display:block; font-weight:700; margin-bottom:0.75rem;">Destination Address</label>
+                            <input type="text" id="cartDestination" placeholder="Enter destination address" oninput="applyCartVoucher()" style="width:100%; padding:1rem; border-radius:12px; border:1px solid #e2e8f0;">
+                            <div id="cartDistanceRow" style="display:none; margin-top:0.75rem; color:#64748b; font-size:0.95rem;">
+                                Estimated distance: <span id="cartDistanceLabel">0 km</span>
+                            </div>
                         </div>
                         ` : ''}
 
@@ -627,10 +653,18 @@
             let f = window.cartTotal;
             
             let ongkir = 0;
-            const distInput = document.getElementById('cartDistance');
-            if (distInput) {
-                const dist = parseFloat(distInput.value) || 0;
-                ongkir = dist * 5000;
+            const destInput = document.getElementById('cartDestination');
+            if (destInput) {
+                const dest = destInput.value.trim();
+                if (dest.length > 2) {
+                    const dist = estimateDistanceFromAddress(dest);
+                    ongkir = Math.ceil(dist * 5000);
+                    document.getElementById('cartDistanceLabel').innerText = dist.toFixed(1) + ' km';
+                    document.getElementById('cartDistanceRow').style.display = 'block';
+                } else {
+                    document.getElementById('cartDistanceLabel').innerText = '0 km';
+                    document.getElementById('cartDistanceRow').style.display = 'none';
+                }
                 document.getElementById('cartOngkirLabel').innerText = 'Rp ' + ongkir.toLocaleString();
             }
 
@@ -771,17 +805,68 @@
             } catch(e) {}
         }
 
+        async function getActiveGrups() {
+            try {
+                const res = await fetch(`/api/grup-keranjang/active?appId=${appId}`);
+                if (!res.ok) return [];
+                const groups = await res.json();
+                activeGrups = groups;
+                return groups;
+            } catch (e) {
+                activeGrups = [];
+                return [];
+            }
+        }
+
+        async function refreshModalGroupSelection() {
+            const groups = await getActiveGrups();
+            const wrapper = document.getElementById('modalGroupSelectWrapper');
+            const select = document.getElementById('modalGroupSelect');
+            const btn = document.getElementById('btnGroupCartModal');
+            if (!wrapper || !select || !btn) return;
+
+            if (groups.length === 0) {
+                wrapper.style.display = 'none';
+                btn.style.display = 'none';
+                selectedModalGrupId = null;
+                return;
+            }
+
+            wrapper.style.display = 'flex';
+            select.innerHTML = groups.map(g => `<option value="${g.id}">Grup #${g.id} - Kode ${g.kodeGrup}</option>`).join('');
+            if (groups.some(g => g.id === activeGrupId)) {
+                selectedModalGrupId = activeGrupId;
+            } else {
+                selectedModalGrupId = groups[0].id;
+            }
+            select.value = selectedModalGrupId;
+            btn.style.display = 'block';
+            btn.innerText = `👥 Tambah ke Group Cart #${selectedModalGrupId}`;
+        }
+
+        function handleModalGroupChange() {
+            const select = document.getElementById('modalGroupSelect');
+            const btn = document.getElementById('btnGroupCartModal');
+            if (!select || !btn) return;
+            selectedModalGrupId = parseInt(select.value) || null;
+            if (selectedModalGrupId) {
+                btn.innerText = `👥 Tambah ke Group Cart #${selectedModalGrupId}`;
+            }
+        }
+
         async function renderGroupCart(title, desc) {
             title.innerText = 'Group Cart';
             desc.innerText = 'Belanja bareng teman dalam satu keranjang.';
             const content = document.getElementById('mainContent');
 
-            const [grupsRes, invitesRes] = await Promise.all([
+            const [grupsRes, invitesRes, productsRes] = await Promise.all([
                 fetch(`/api/grup-keranjang/active?appId=${appId}`),
-                fetch('/api/grup-keranjang/invites')
+                fetch('/api/grup-keranjang/invites'),
+                fetch(`/api/apps/${appId}/products`)
             ]);
             const grups = await grupsRes.json();
             const invites = await invitesRes.json();
+            groupCatalogProducts = await productsRes.json();
             // Filter invites berdasarkan appId yang cocok (cast ke Number karena JSON int)
             const pendingInvites = invites.filter(g => Number(g.appId) === appId);
 
@@ -832,11 +917,17 @@
                         </div>
                     </div>
 
-                    <div id="grupDetail">
-                        <div class="app-card" style="text-align:center; padding:4rem; color:#94a3b8;">
-                            <div style="font-size:3rem; margin-bottom:1rem;">🛒</div>
-                            <div style="font-weight:600;">Pilih grup untuk melihat detail</div>
-                            <div style="font-size:0.875rem; margin-top:0.5rem;">Atau buat grup baru untuk mulai belanja bersama</div>
+                    <div style="display:grid; grid-template-columns: 1fr; gap:1.5rem;">
+                        <div id="grupDetail">
+                            <div class="app-card" style="text-align:center; padding:4rem; color:#94a3b8;">
+                                <div style="font-size:3rem; margin-bottom:1rem;">🛒</div>
+                                <div style="font-weight:600;">Pilih grup untuk melihat detail</div>
+                                <div style="font-size:0.875rem; margin-top:0.5rem;">Atau buat grup baru untuk mulai belanja bersama</div>
+                            </div>
+                        </div>
+                        <div class="app-card">
+                            <div style="font-weight:800; margin-bottom:1rem;">Katalog Produk</div>
+                            <div class="grid" style="grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:1rem;" id="groupCatalog"></div>
                         </div>
                     </div>
                 </div>
@@ -846,6 +937,7 @@
             if (activeGrupId && grups.find(g => g.id === activeGrupId)) {
                 openGrup(activeGrupId);
             }
+            renderGroupCatalog();
         }
 
         async function createGrup() {
@@ -857,7 +949,9 @@
             if (res.ok) {
                 const grup = await res.json();
                 alert('Grup berhasil dibuat!\nKode Grup: ' + grup.kodeGrup + '\nBagikan kode ini ke teman kamu.');
-                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                activeGrupId = grup.id;
+                await renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                openGrup(grup.id);
             }
         }
 
@@ -866,6 +960,9 @@
             const res = await fetch('/api/grup-keranjang/' + grupId);
             if (!res.ok) { alert('Gagal memuat detail grup'); return; }
             const grup = await res.json();
+
+            activeGrupId = grupId;
+            selectedModalGrupId = grupId;
 
             const isOwner = grup.ownerEmail === user.email;
             const totalGrup = grup.items.reduce((s, i) => s + i.productHarga * i.qty, 0);
@@ -975,7 +1072,13 @@
             });
             if (res.ok) {
                 alert(action === 'ACCEPT' ? 'Kamu bergabung ke grup!' : 'Undangan ditolak');
-                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                if (action === 'ACCEPT') {
+                    activeGrupId = grupId;
+                    await renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                    openGrup(grupId);
+                } else {
+                    renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                }
             }
         }
 
@@ -1017,20 +1120,31 @@
 
         let tempCartItem = null;
 
-        function addToCart(id, name, price) {
+        async function addToCart(id, name, price) {
             tempCartItem = { id, name, price };
             document.getElementById('modalProductName').innerText = name;
             document.getElementById('modalProductPrice').innerText = 'Rp ' + price.toLocaleString();
             document.getElementById('modalQty').value = 1;
-            
+
             const btnGroup = document.getElementById('btnGroupCartModal');
-            if (activeGrupId) {
+            const btnPersonal = document.getElementById('btnPersonalCartModal');
+            const wrapper = document.getElementById('modalGroupSelectWrapper');
+
+            if (currentView === 'groupcart') {
+                await refreshModalGroupSelection();
+                btnPersonal.style.display = 'none';
                 btnGroup.style.display = 'block';
-                btnGroup.innerText = `👥 Tambah ke Group Cart #${activeGrupId}`;
+                if (activeGrups.length > 1) {
+                    wrapper.style.display = 'flex';
+                } else {
+                    wrapper.style.display = 'none';
+                }
             } else {
+                btnPersonal.style.display = 'block';
                 btnGroup.style.display = 'none';
+                wrapper.style.display = 'none';
             }
-            
+
             document.getElementById('cartModal').style.display = 'flex';
         }
 
@@ -1054,9 +1168,10 @@
         }
 
         function confirmGroupCart() {
-            if (!tempCartItem || !activeGrupId) return;
+            const grupId = selectedModalGrupId || activeGrupId;
+            if (!tempCartItem || !grupId) return;
             const qty = parseInt(document.getElementById('modalQty').value) || 1;
-            addToGrupCart(activeGrupId, tempCartItem.id, tempCartItem.name, tempCartItem.price, qty);
+            addToGrupCart(grupId, tempCartItem.id, tempCartItem.name, tempCartItem.price, qty);
             closeCartModal();
         }
 
@@ -1078,6 +1193,25 @@
             } else {
                 alert('Gagal menambahkan ke Group Cart');
             }
+        }
+
+        function renderGroupCatalog() {
+            const catalog = document.getElementById('groupCatalog');
+            if (!catalog) return;
+            if (!groupCatalogProducts || groupCatalogProducts.length === 0) {
+                catalog.innerHTML = '<div style="color:#64748b;">Belum ada katalog produk.</div>';
+                return;
+            }
+            catalog.innerHTML = groupCatalogProducts.map(p => `
+                <div class="product-item" style="padding:1rem;">
+                    <div style="height:140px; background: #f8fafc; display:flex; align-items:center; justify-content:center; font-size:3rem; border-radius:12px; margin-bottom:1rem;">
+                        ${p.kategori === 'Coffee' ? '☕' : (p.kategori === 'Food' ? '🥪' : '📦')}
+                    </div>
+                    <div style="font-weight:700; margin-bottom:0.5rem;">${p.nama}</div>
+                    <div style="color:var(--app-primary); font-weight:800; margin-bottom:1rem;">Rp ${p.harga.toLocaleString()}</div>
+                    <button class="btn-action" style="width:100%;" onclick="addToCart(${p.id}, '${p.nama}', ${p.harga})">Tambah ke Group Cart</button>
+                </div>
+            `).join('');
         }
 
         init();
