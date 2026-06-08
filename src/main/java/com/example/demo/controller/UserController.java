@@ -21,14 +21,14 @@ public class UserController {
 
     @GetMapping("/riwayat")
     public ResponseEntity<List<String>> getRiwayat(HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(riwayatDAO.findByUser(user.getEmail()));
     }
 
     @PostMapping("/init-saldo")
     public ResponseEntity<?> initSaldo(@RequestBody Map<String, Object> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         int appId = (Integer) payload.get("appId");
@@ -44,14 +44,14 @@ public class UserController {
 
     @GetMapping("/profile/{appId}")
     public ResponseEntity<Map<String, String>> getAppProfile(@PathVariable int appId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(profileDAO.getProfile(user.getEmail(), appId));
     }
 
     @PostMapping("/profile/{appId}/update")
     public ResponseEntity<?> updateAppProfile(@PathVariable int appId, @RequestBody Map<String, String> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         String phone = payload.get("phone");
@@ -63,7 +63,7 @@ public class UserController {
 
     @PostMapping("/update")
     public ResponseEntity<?> updateGlobalProfile(@RequestBody Map<String, String> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         String newName = payload.get("name");
@@ -72,6 +72,7 @@ public class UserController {
         
         User updatedUser = userDAO.findByEmail(user.getEmail());
         session.setAttribute("user", updatedUser);
+        session.setAttribute("user_" + updatedUser.getEmail(), updatedUser);
         return ResponseEntity.ok(updatedUser);
     }
 }

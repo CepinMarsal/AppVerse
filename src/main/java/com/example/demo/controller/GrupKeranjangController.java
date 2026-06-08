@@ -29,7 +29,7 @@ public class GrupKeranjangController {
     // Buat grup baru
     @PostMapping("/create")
     public ResponseEntity<?> createGrup(@RequestBody Map<String, Object> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         int appId = (Integer) payload.get("appId");
@@ -42,7 +42,7 @@ public class GrupKeranjangController {
     public ResponseEntity<?> inviteUser(@PathVariable int grupId,
                                         @RequestBody Map<String, String> payload,
                                         HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         GrupKeranjang grup = grupDAO.findById(grupId);
@@ -71,7 +71,7 @@ public class GrupKeranjangController {
     // Lihat undangan pending milik user yang login
     @GetMapping("/invites")
     public ResponseEntity<List<GrupKeranjang>> getPendingInvites(HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(grupDAO.findPendingInvites(user.getEmail()));
     }
@@ -81,7 +81,7 @@ public class GrupKeranjangController {
     public ResponseEntity<?> respondInvite(@PathVariable int grupId,
                                            @RequestBody Map<String, String> payload,
                                            HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         String action = payload.get("action"); // "ACCEPT" atau "REJECT"
@@ -100,7 +100,7 @@ public class GrupKeranjangController {
     // Lihat semua grup aktif user di app tertentu
     @GetMapping("/active")
     public ResponseEntity<List<GrupKeranjang>> getActiveGrups(@RequestParam int appId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(grupDAO.findActiveByUser(user.getEmail(), appId));
     }
@@ -108,7 +108,7 @@ public class GrupKeranjangController {
     // Detail grup (termasuk member dan item)
     @GetMapping("/{grupId}")
     public ResponseEntity<?> getGrupDetail(@PathVariable int grupId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         GrupKeranjang grup = grupDAO.findById(grupId);
@@ -130,7 +130,7 @@ public class GrupKeranjangController {
     public ResponseEntity<?> addItem(@PathVariable int grupId,
                                      @RequestBody Map<String, Object> payload,
                                      HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         GrupKeranjang grup = grupDAO.findById(grupId);
@@ -157,7 +157,7 @@ public class GrupKeranjangController {
     public ResponseEntity<?> removeItem(@PathVariable int grupId,
                                         @PathVariable int itemId,
                                         HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         GrupKeranjang grup = grupDAO.findById(grupId);
@@ -177,7 +177,7 @@ public class GrupKeranjangController {
     public ResponseEntity<?> checkout(@PathVariable int grupId,
                                       @RequestBody(required = false) Map<String, Object> payload,
                                       HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         GrupKeranjang grup = grupDAO.findById(grupId);

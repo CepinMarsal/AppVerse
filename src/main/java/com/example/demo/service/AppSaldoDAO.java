@@ -68,13 +68,15 @@ public class AppSaldoDAO {
         }
     }
 
-    public void transferSaldo(String oldUserEmail, String newUserEmail, int appId, double amount) throws SQLException {
+    public boolean transferSaldo(String oldUserEmail, String newUserEmail, int appId, double amount) throws SQLException {
         double currentSaldo = getSaldo(oldUserEmail, appId);
         if (currentSaldo >= amount) {
             updateSaldo(oldUserEmail, appId, currentSaldo - amount);
             double targetSaldo = getSaldo(newUserEmail, appId);
             updateSaldo(newUserEmail, appId, targetSaldo + amount);
+            return true;
         }
+        return false;
     }
 
     public void updateSaldo(String userEmail, int appId, double newSaldo) throws SQLException {

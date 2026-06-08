@@ -30,6 +30,7 @@ public class AuthController {
         User user = authService.login(email, fingerprint, userDAO.findAll(), verifikasi);
         if (user != null) {
             session.setAttribute("user", user);
+            session.setAttribute("user_" + email, user);
             return ResponseEntity.ok(user);
         } else {
             return ResponseEntity.status(401).body("Login failed: Invalid email or fingerprint");
@@ -90,7 +91,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<?> me(HttpSession session) {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user != null) {
             return ResponseEntity.ok(user);
         }

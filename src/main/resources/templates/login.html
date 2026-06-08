@@ -59,6 +59,7 @@
                 });
 
                 if (response.ok) {
+                    sessionStorage.setItem('loggedInEmail', email);
                     window.location.href = '/dashboard';
                 } else {
                     const err = await response.text();

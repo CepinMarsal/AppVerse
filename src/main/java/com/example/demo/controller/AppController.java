@@ -32,7 +32,7 @@ public class AppController {
 
     @PostMapping("/{appId}/claim")
     public ResponseEntity<?> claimVouchers(@PathVariable int appId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         
         voucherDAO.initializeVouchersForNewUser(user.getEmail(), user.getBiometrik().getFingerprint(), appId);
@@ -41,14 +41,14 @@ public class AppController {
 
     @GetMapping("/saldo")
     public ResponseEntity<Map<Integer, Double>> getMySaldo(HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(saldoDAO.getAllSaldoByUser(user.getEmail()));
     }
 
     @PostMapping("/{appId}/init")
     public ResponseEntity<?> initApp(@PathVariable int appId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         
         voucherDAO.initializeVouchersForNewUser(user.getEmail(), user.getBiometrik().getFingerprint(), appId);
@@ -57,7 +57,7 @@ public class AppController {
 
     @GetMapping("/{appId}/vouchers")
     public ResponseEntity<List<Voucher>> getMyVouchers(@PathVariable int appId, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
         
         List<Voucher> list = voucherDAO.findByUserAndApp(user.getEmail(), appId);
@@ -71,7 +71,7 @@ public class AppController {
 
     @PostMapping("/transfer")
     public ResponseEntity<?> transferSaldo(@RequestBody Map<String, Object> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         String targetEmail = (String) payload.get("targetEmail");
@@ -79,7 +79,10 @@ public class AppController {
         double amount = Double.parseDouble(payload.get("amount").toString());
         String activity = payload.containsKey("activity") ? payload.get("activity").toString() : "Transfer";
 
-        saldoDAO.transferSaldo(user.getEmail(), targetEmail, appId, amount);
+        boolean success = saldoDAO.transferSaldo(user.getEmail(), targetEmail, appId, amount);
+        if (!success) {
+            return ResponseEntity.badRequest().body("Saldo Anda tidak cukup untuk melakukan transaksi ini.");
+        }
         new com.example.demo.dao.RiwayatDAO().insert(user.getEmail(), appId, activity, amount);
         
         return ResponseEntity.ok("Transfer successful");
@@ -126,7 +129,7 @@ public class AppController {
 
     @PostMapping("/posts")
     public ResponseEntity<?> createPost(@RequestBody Map<String, String> payload, HttpSession session) throws SQLException {
-        User user = (User) session.getAttribute("user");
+        User user = SessionUtil.getUser(session);
         if (user == null) return ResponseEntity.status(401).build();
 
         String content = payload.get("content");

@@ -125,6 +125,27 @@
         .profile-row { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid #f1f5f9; }
         .profile-label { color: #64748b; font-weight: 500; }
         .profile-value { font-weight: 700; color: #1e293b; }
+
+        /* Toast Notification Styling */
+        .toast-notification {
+            position: fixed;
+            bottom: 2rem;
+            right: -25rem;
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 700;
+            z-index: 99999;
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .toast-notification.show {
+            right: 2rem;
+        }
     </style>
 </head>
 <body id="appBody">
@@ -179,6 +200,43 @@
     </div>
 
     <script>
+        // Fetch interceptor to inject X-User-Email header
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+            const email = sessionStorage.getItem('loggedInEmail');
+            if (email) {
+                options.headers = options.headers || {};
+                if (options.headers instanceof Headers) {
+                    options.headers.set('X-User-Email', email);
+                } else {
+                    options.headers['X-User-Email'] = email;
+                }
+            }
+            return originalFetch(url, options);
+        };
+
+        function showToast(message, type = 'error') {
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            if (type === 'success') {
+                toast.style.background = 'linear-gradient(135deg, #10b981, #047857)';
+                toast.style.boxShadow = '0 10px 25px -5px rgba(16, 185, 129, 0.4)';
+                toast.innerHTML = `<span>✓</span> <span>${message}</span>`;
+            } else {
+                toast.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+                toast.style.boxShadow = '0 10px 25px -5px rgba(239, 68, 68, 0.4)';
+                toast.innerHTML = `<span>⚠️</span> <span>${message}</span>`;
+            }
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 50);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
         const pathParts = window.location.pathname.split('/');
         const appId = parseInt(pathParts[pathParts.length - 1]);
         
@@ -198,6 +256,11 @@
             const userRes = await fetch('/api/auth/me');
             if (!userRes.ok) { window.location.href = '/login'; return; }
             user = await userRes.json();
+
+            // Sync email to sessionStorage if missing
+            if (!sessionStorage.getItem('loggedInEmail') && user.email) {
+                sessionStorage.setItem('loggedInEmail', user.email);
+            }
 
             // Auto Init App (Claim Vouchers, etc.)
             await fetch(`/api/apps/${appId}/init`, { method: 'POST' });
@@ -724,51 +787,71 @@
 
         async function checkout() {
             const price = window.finalCartPrice || window.cartTotal;
-            if(userSaldo < price) { alert('Insufficient balance!'); return; }
+            if(userSaldo < price) {
+                showToast('Saldo Anda tidak cukup untuk melakukan checkout!', 'error');
+                return;
+            }
             
             const vId = document.getElementById('cartVoucher').value;
             
-            const res = await fetch('/api/apps/transfer', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: price, activity: 'Checkout Products' })
-            });
-            
-            if(res.ok) { 
-                let msg = 'Order Successful!';
-                if(vId) {
-                    await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
-                    msg += '\nVoucher applied successfully!';
+            try {
+                const res = await fetch('/api/apps/transfer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: price, activity: 'Checkout Products' })
+                });
+                
+                const text = await res.text();
+                if(res.ok) { 
+                    let msg = 'Order Successful!';
+                    if(vId) {
+                        await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                        msg += ' Voucher applied successfully!';
+                    }
+                    showToast(msg, 'success');
+                    cart = []; 
+                    updateCartBadge(); 
+                    await updateSaldo(); 
+                    showView('history'); 
+                } else {
+                    showToast(text || 'Transaksi gagal.', 'error');
                 }
-                alert(msg); 
-                cart = []; 
-                updateCartBadge(); 
-                await updateSaldo(); 
-                showView('history'); 
+            } catch (e) {
+                showToast('Terjadi kesalahan koneksi atau sistem.', 'error');
             }
         }
 
         async function confirmGojek() {
             const p = window.finalGPrice;
-            if(userSaldo < p) { alert('Insufficient balance!'); return; }
+            if(userSaldo < p) {
+                showToast('Saldo Anda tidak cukup untuk memesan GoRide!', 'error');
+                return;
+            }
             
             const vId = document.getElementById('gVoucher').value;
             
-            const res = await fetch('/api/apps/transfer', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: p, activity: 'GoRide Order' })
-            });
-            
-            if(res.ok) { 
-                let msg = 'Driver found! Ride successful.';
-                if(vId) {
-                    await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
-                    msg += '\nVoucher applied successfully!';
+            try {
+                const res = await fetch('/api/apps/transfer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ appId, targetEmail: 'system@company.com', amount: p, activity: 'GoRide Order' })
+                });
+                
+                const text = await res.text();
+                if(res.ok) { 
+                    let msg = 'Driver found! Ride successful.';
+                    if(vId) {
+                        await fetch(`/api/apps/vouchers/${vId}/use`, {method:'POST'});
+                        msg += ' Voucher applied successfully!';
+                    }
+                    showToast(msg, 'success');
+                    await updateSaldo(); 
+                    showView('history'); 
+                } else {
+                    showToast(text || 'Transaksi gagal.', 'error');
                 }
-                alert(msg); 
-                await updateSaldo(); 
-                showView('history'); 
+            } catch (e) {
+                showToast('Terjadi kesalahan koneksi atau sistem.', 'error');
             }
         }
 
@@ -1090,15 +1173,27 @@
 
         async function checkoutGrup(grupId) {
             if (!confirm('Checkout grup? Sebagai owner, Anda akan membayar (mentraktir) seluruh item di keranjang ini.')) return;
-            const res = await fetch('/api/grup-keranjang/' + grupId + '/checkout', { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                let msg = data.message + '\n\nTotal Dibayar: Rp ' + (data.grandTotal ? data.grandTotal.toLocaleString() : '0');
-                alert(msg);
-                await updateSaldo();
-                renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
-            } else {
-                alert('Gagal: ' + (data.message || JSON.stringify(data)));
+            try {
+                const res = await fetch('/api/grup-keranjang/' + grupId + '/checkout', { method: 'POST' });
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = text;
+                }
+                
+                if (res.ok) {
+                    const msg = (data && data.message ? data.message : 'Checkout berhasil!') + '\n\nTotal Dibayar: Rp ' + (data && data.grandTotal ? data.grandTotal.toLocaleString() : '0');
+                    showToast(msg, 'success');
+                    await updateSaldo();
+                    renderGroupCart(document.getElementById('viewTitle'), document.getElementById('viewDesc'));
+                } else {
+                    const errMsg = (data && data.message) ? data.message : (typeof data === 'string' ? data : 'Gagal melakukan checkout');
+                    showToast(errMsg, 'error');
+                }
+            } catch (err) {
+                showToast('Terjadi kesalahan koneksi atau sistem.', 'error');
             }
         }
 
